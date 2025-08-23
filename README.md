@@ -20,9 +20,9 @@ It comes with **built-in commands**, **community plugins**, and **extensible arc
 
 ## 🥭 Installation
 Install the latest version directly from GitHub:
-
+```bash
 pip install git+https://github.com/Paopun20/paopao-cli.git
-
+```
 ---
 
 ## 🚀 Usage
