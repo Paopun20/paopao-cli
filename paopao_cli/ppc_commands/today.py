@@ -123,7 +123,7 @@ def create_quarter_with_boxes(year, start_month, color):
     return Columns(month_panels, expand=False, padding=(1, 2))
 
 def show_full_year_calendar(year=None):
-    year = year or datetime.now().year
+    year = int(year or datetime.now().year)
     quarter_colors = ["bold blue", "bold green", "bold yellow", "bold magenta"]
 
     quarter_panels = []
