@@ -1,0 +1,7 @@
+Activate.ps1
+env/*
+build/*
+.vscode/*
+paopao_cli.egg-info/*
+__pycache__/*
+*.pyc
