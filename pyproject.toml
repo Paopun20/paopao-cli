@@ -4,13 +4,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "paopao-cli"
-version = "0.0.1.dev4"
-license = "Apache-2.0"
+version = "0.0.1.dev5"
 description = "🥭 PaoPao CLI Framework - Plugin-based CLI system"
-authors = [{name="PaoPaoDev"}]
 readme = "README.md"
 requires-python = ">=3.9"
-dependencies = ["rich>=13.0.0", "rich-argparse>=1.7.1"]
+license = { text = "Apache-2.0" }
+authors = [{ name = "PaoPaoDev" }]
+dependencies = [
+    "rich>=13.0.0",
+    "rich-argparse>=1.7.1"
+]
 
 [project.scripts]
 ppc = "paopao_cli.main:main"
