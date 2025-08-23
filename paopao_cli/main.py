@@ -449,9 +449,7 @@ class PaoPaoCLI:
             # Handle plugin commands
             self.command_manager.load_and_run_command(args.command, args.args)
 
-# ---- Entry Point ----
 def main():
-    """Main entry point."""
     try:
         cli = PaoPaoCLI()
         cli.run()
