@@ -25,8 +25,8 @@ from rich import box
 # ---- Configuration ----
 class Config:
     """Configuration constants for the CLI framework."""
-    COMMANDS_DIR = Path(__file__).parent / "ppc_commands"
-    COMMUNITY_COMMANDS_DIR = Path(__file__).parent / "ppc_commands"
+    COMMANDS_DIR = Path(__file__).parent / "ppc_commands"        # official commands
+    COMMUNITY_COMMANDS_DIR = Path(__file__).parent / "ppc_addon" # changed from ppc_commands
     PROJECT_META_FILE = "ppc.project.json"
     GIT_META_FILE = ".ppc.git"
     
