@@ -21,7 +21,7 @@ It comes with **built-in commands**, **community plugins**, and **extensible arc
 ## 🥭 Installation
 Install the latest version directly from GitHub:
 
-pip install git+https://github.com/paoun20/paopao-command.git
+pip install git+https://github.com/Paopun20/paopao-cli.git
 
 ---
 
