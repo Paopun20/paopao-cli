@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "paopao-cli"
-version = "0.0.1a1"
+version = "0.0.1a2"
 license = "Apache-2.0"
 description = "🥭 PaoPao CLI Framework - Plugin-based CLI system"
 authors = [{name="PaoPaoDev"}]

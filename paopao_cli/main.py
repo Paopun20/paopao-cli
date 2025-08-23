@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🥭 PaoPao CLI Framework - Refactored Version
+🥭 PaoPao CLI Framework
 A plugin-based CLI system with command management capabilities.
 """
 
