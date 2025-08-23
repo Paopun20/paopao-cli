@@ -1,3 +1,16 @@
 [build-system]
-requires = ["setuptools", "wheel", "rich", "rich_argparse"]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "paopao-cli"
+version = "0.0.test_1"
+license = "Apache-2.0"
+description = "🥭 PaoPao CLI Framework - Plugin-based CLI system"
+authors = [{name="PaoPaoDev"}]
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = ["rich>=13.0.0", "rich-argparse>=1.7.1"]
+
+[project.scripts]
+ppc = "paopao_cli.main:main"

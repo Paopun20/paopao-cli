@@ -60,7 +60,7 @@ def build_tree(directory: Path, tree: Tree, base_path: Path, ignore_spec=None):
     except PermissionError:
         tree.add("[ [red]🚫 Permission Denied[/] ]")
 
-def main():
+def main(argv):
     parser = argparse.ArgumentParser(description="Display directory tree with icons and optional .gitignore filtering.")
     parser.add_argument(
         "directory",
@@ -73,7 +73,7 @@ def main():
         metavar="GITIGNORE_FILE",
         help="Path to a .gitignore file to exclude files/folders"
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     root_dir = Path(os.path.expandvars(args.directory)).resolve()
 
