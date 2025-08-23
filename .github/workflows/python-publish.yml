@@ -31,6 +31,8 @@ jobs:
   pypi-publish:
     runs-on: ubuntu-latest
     needs: release-build
+    environment:
+      name: PYPI_API_TOKEN
     steps:
       - name: Retrieve release distributions
         uses: actions/download-artifact@v4
