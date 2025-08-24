@@ -205,17 +205,17 @@ class REPL(code.InteractiveConsole):
 """
         console.print(Panel.fit(help_text, title="🧪 REPL Help", border_style="blue"))
     
-    def exit_repl(self):
+    def exit_repl(self, *_):
         """Exit the REPL."""
         self._should_exit = True
         raise SystemExit("Exiting REPL")
     
-    def clear_screen(self):
+    def clear_screen(self, *_):
         """Clear the console screen."""
         console.clear()
         return "Screen cleared"
     
-    def show_history(self):
+    def show_history(self, *_):
         """Show command history."""
         if not self.history:
             console.print("[dim]No history yet[/dim]")
