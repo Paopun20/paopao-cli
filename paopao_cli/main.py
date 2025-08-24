@@ -91,6 +91,7 @@ class REPL(code.InteractiveConsole):
         self.command_manager = command_manager
         self.history = []
         self.max_history = 100
+        self._should_exit = False
         
         # Setup default environment
         if local_vars is None:
@@ -121,7 +122,8 @@ class REPL(code.InteractiveConsole):
             'quit': self.exit_repl,
             'clear': self.clear_screen,
             'history': self.show_history,
-            'load_command': self.load_command_test
+            'load_command': self.load_command_test,
+            'run_command': self.run_command_safe
         })
     
     def load_command_test(self, command_name):
@@ -143,6 +145,39 @@ class REPL(code.InteractiveConsole):
             console.print("[yellow]⚠️ Command manager not available[/yellow]")
         return None
     
+    def run_command_safe(self, command_name, args=None):
+        """
+        Safely run a command without exiting REPL on error.
+        
+        Args:
+            command_name: Name of the command or loaded module
+            args: List of arguments to pass to the command
+        """
+        if args is None:
+            args = []
+        
+        try:
+            # Check if it's a loaded module
+            if isinstance(command_name, str) and command_name in self.locals:
+                module = self.locals[command_name]
+            elif hasattr(command_name, 'main'):
+                module = command_name
+            else:
+                console.print(f"[red]❌ Command '{command_name}' not found or not loaded[/red]")
+                return False
+            
+            # Run the command with error handling
+            module.main(args)
+            return True
+            
+        except SystemExit as e:
+            # Catch argparse SystemExit but don't exit REPL
+            console.print(f"[yellow]⚠️ Command exited with code {e.code}[/yellow]")
+            return False
+        except Exception as e:
+            console.print(f"[red]❌ Error running command: {e}[/red]")
+            return False
+    
     def show_help(self):
         """Show REPL help information."""
         help_text = """
@@ -157,12 +192,14 @@ class REPL(code.InteractiveConsole):
   clear()     - Clear screen
   history()   - Show command history
   load_command(name) - Load a PaoPao command for testing
+  run_command(cmd, args) - Safely run a command without exiting REPL
 
 [cyan]Example usage:[/cyan]
   >>> result = subprocess.run(['ls', '-la'], capture_output=True, text=True)
   >>> print(result.stdout)
-  >>> load_command('some_command')
-  >>> some_command.main(['--help'])
+  >>> passgen = load_command('passgen')
+  >>> run_command(passgen, ['--length', '12'])  # Safe execution
+  >>> passgen.main(['--length', '12'])          - Direct execution (may exit)
 
 [cyan]Use Ctrl-D or type 'exit()' to quit.[/cyan]
 """
@@ -170,8 +207,8 @@ class REPL(code.InteractiveConsole):
     
     def exit_repl(self):
         """Exit the REPL."""
-        self.stop_event.set()
-        raise SystemExit
+        self._should_exit = True
+        raise SystemExit("Exiting REPL")
     
     def clear_screen(self):
         """Clear the console screen."""
@@ -201,10 +238,28 @@ class REPL(code.InteractiveConsole):
             self.history.pop(0)
         
         try:
-            return super().runsource(source, filename, symbol)
+            result = super().runsource(source, filename, symbol)
+            # If user called exit(), we need to propagate the SystemExit
+            if self._should_exit:
+                raise SystemExit("Exiting REPL")
+            return result
+        except SystemExit as e:
+            # Only show warning if it wasn't a user-initiated exit
+            if not self._should_exit:
+                console.print("[yellow]⚠️ Command attempted to exit REPL - caught and prevented[/yellow]")
+                return False
+            else:
+                # Re-raise if it was a user exit
+                raise
         except Exception as e:
             console.print(f"[red]Error: {e}[/red]")
             return False
+    
+    def raw_input(self, prompt=""):
+        """Custom raw_input that handles exit flag."""
+        if self._should_exit:
+            raise SystemExit("Exiting REPL")
+        return super().raw_input(prompt)
     
     def run(self, banner=None):
         """Run the enhanced REPL."""
@@ -213,18 +268,51 @@ class REPL(code.InteractiveConsole):
 [bold green]🧪 PaoPao REPL Mode (experiment)[/bold green]
 [dim]Type 'help()' for assistance, 'exit()' to quit.[/dim]
 [dim]Loaded commands available through load_command('name')[/dim]
+[dim]Use run_command() for safe execution without exiting REPL[/dim]
 """
         
         console.print(banner)
         
         try:
-            self.interact(banner="")
-        except SystemExit:
-            pass
+            # Use the standard interact method but with our custom handling
+            more = 0
+            while not self._should_exit:
+                try:
+                    # Use standard Python REPL prompts
+                    if more:
+                        prompt = "... "  # Secondary prompt for multi-line input
+                    else:
+                        prompt = ">>> "  # Primary prompt
+                    
+                    try:
+                        line = self.raw_input(prompt)
+                    except EOFError:
+                        console.print("\n[blue]👋 Exiting REPL mode (EOF)...[/blue]")
+                        break
+                    except SystemExit:
+                        # This handles the case where exit() is called during raw_input
+                        console.print("[blue]👋 Exiting REPL mode...[/blue]")
+                        break
+                    
+                    more = self.push(line)
+                    
+                except KeyboardInterrupt:
+                    console.print("\n[yellow]KeyboardInterrupt[/yellow]")
+                    self.resetbuffer()
+                    more = 0
+                except SystemExit as e:
+                    if "Exiting REPL" in str(e):
+                        console.print("[blue]👋 Exiting REPL mode...[/blue]")
+                        break
+                    else:
+                        console.print("[yellow]⚠️ Command attempted to exit REPL - caught and prevented[/yellow]")
+                        self.resetbuffer()
+                        more = 0
+                        
         except Exception as e:
-            console.print(f"[red]Error in REPL: {e}[/red]")
-        finally:
-            console.print("[bold green]👋 Exiting REPL mode.[/bold green]")
+            console.print(f"[red]Unexpected error in REPL: {e}[/red]")
+            import traceback
+            console.print(traceback.format_exc())
 
 # ---- Utility Classes ----
 class SecurityValidator:
