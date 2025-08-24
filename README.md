@@ -142,11 +142,22 @@ paopao-cli/
 ```
 
 ### Command Structure
+# Addon Structure 0.0.1.1dev8+ (can add multiple commands per repository)
+```
+my-command/
+├── commands/
+│   ├── command_name.py
+│   ├── another_command.py
+│   └── ...
+├── ppc.project.json     # Project metadata
+├── requirements.txt     # Dependencies (optional)
+└── README.md           # Documentation (optional)
+
+# Legacy Structure (can add only one command per repository)
 ```
 my-command/
 ├── main.py              # Entry point (required)
 ├── ppc.project.json     # Project metadata
-├── .ppc.git            # Git installation info
 ├── requirements.txt     # Dependencies (optional)
 └── README.md           # Documentation (optional)
 ```
@@ -167,15 +178,6 @@ my-command/
   "keywords": ["automation", "productivity"],
   "homepage": "https://github.com/user/awesome-tool"
 }
-```
-
-### Environment Configuration
-```python
-# Custom configuration
-class CustomConfig(Config):
-    CACHE_EXPIRY_HOURS = 12  # Shorter cache
-    MAX_INSTALL_TIME_SECONDS = 600  # 10 minutes timeout
-    ALLOWED_URL_SCHEMES = ["https", "ssh"]  # HTTPS and SSH only
 ```
 
 ---
@@ -223,7 +225,10 @@ ppc doctor --verbose
 **Git errors?**
 ```bash
 # Verify git installation
-git --version
+git --version # Should return git version if not installed, go to https://git-scm.com/downloads for installation
+# or
+pip show GitPython # Should return GitPython package info if not installed, run pip install GitPython
+
 # Check network connectivity
 ppc install https://github.com/test/repo
 ```
@@ -242,86 +247,8 @@ ppc doctor  # Basic check
 ## 🤝 Contributing
 
 ### Creating Commands
-1. **Fork** a template or create from scratch
-2. **Implement** `main(argv)` function in `main.py`
-3. **Add metadata** in `ppc.project.json`
-4. **Test locally** with `ppc test`
-5. **Publish** to Git repository
-
-### Command Template
-```python
-#!/usr/bin/env python3
-"""
-My Awesome Command
-"""
-
-import argparse
-from rich.console import Console
-
-console = Console()
-
-def main(argv):
-    parser = argparse.ArgumentParser(description="My awesome command")
-    parser.add_argument("--option", help="An option")
-    
-    args = parser.parse_args(argv)
-    
-    console.print("[green]Hello from my awesome command![/green]")
-    
-    if args.option:
-        console.print(f"Option value: {args.option}")
-
-if __name__ == "__main__":
-    import sys
-    main(sys.argv[1:])
-```
-
----
-
-## 📚 Examples
-
-### Daily Workflow Commands
-```bash
-# Development workflow
-ppc install https://github.com/dev/git-tools
-ppc install https://github.com/dev/docker-helper
-ppc install https://github.com/dev/deploy-scripts
-
-# System administration
-ppc install https://github.com/admin/server-monitor
-ppc install https://github.com/admin/backup-tools
-
-# Productivity tools
-ppc install https://github.com/tools/time-tracker
-ppc install https://github.com/tools/note-manager
-```
-
-### Automation Scripts
-```bash
-# Install build tools
-ppc install https://github.com/ci/build-pipeline
-
-# Use the installed command
-ppc build-pipeline --env staging --notify slack
-```
-
----
-
-## 🏷️ Version History
-
-### v2.0.0 (Enhanced Edition)
-- ✅ **Security framework** with validation
-- ✅ **Performance improvements** with caching
-- ✅ **Enhanced user experience** with Rich UI
-- ✅ **System diagnostics** with `doctor` command
-- ✅ **Advanced command management**
-- ✅ **Comprehensive error handling**
-
-### v1.0.0 (Original)
-- ✅ Basic command management
-- ✅ Git repository integration
-- ✅ Plugin architecture
-- ✅ Rich terminal output
+This is a simple template to create your own command compatible with PaoPao CLI.
+AND THIS REPO IS OPEN SOURCE, YOU CAN CONTRIBUTE YOUR COMMANDS TO THE COMMUNITY! BUT UNDER APACHE LICENSE 2.0
 
 ---
 
@@ -334,7 +261,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 💬 Support
 
 - 🐛 **Issues**: [GitHub Issues](https://github.com/Paopun20/paopao-cli/issues)
-- 💡 **Discussions**: [GitHub Discussions](https://github.com/Paopun20/paopao-cli/discussions)
 
 ---
 
@@ -344,7 +270,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Python** community for excellent tooling
 - **Git** for reliable version control
 - **Open Source** contributors worldwide
-
----
-
-*Built with ❤️ by the PaoPao development team*

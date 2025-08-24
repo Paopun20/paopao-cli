@@ -10,6 +10,12 @@ try:
 except ImportError:
     raise RuntimeError("Bruh, PaoPao CLI core not found. You are remove __init__.py file?")
 
+try:
+    import git
+    GITPYTHON_AVAILABLE = True
+except ImportError:
+    GITPYTHON_AVAILABLE = False
+
 # standard libraries
 import argparse
 import sys
@@ -859,11 +865,11 @@ class BuiltinCommands:
         self.cm = command_manager
         self.config = config
         self.security_validator = SecurityValidator()
-    
+
     def install(self, argv: list):
-        """Install a community command with enhanced features."""
+        """Install a community command with enhanced features using GitPython."""
         formatter_class = rich_argparse.RichHelpFormatter if RICH_AVAILABLE else argparse.HelpFormatter
-        
+
         parser = argparse.ArgumentParser(
             prog="ppc install",
             description="Install a community command from a git repository",
@@ -875,175 +881,45 @@ class BuiltinCommands:
         parser.add_argument("-f", "--force", action="store_true", help="Force overwrite existing command")
         parser.add_argument("--branch", help="Specific branch to install")
         parser.add_argument("--no-verify", action="store_true", help="Skip security validation")
-        
+
         try:
             args = parser.parse_args(argv)
         except SystemExit:
             return
-        
-        # Check if git is available
-        try:
-            subprocess.run(["git", "--version"], check=True, capture_output=True, timeout=5)
-        except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
-            console.print("❌ Git is not installed or not accessible")
+
+        if not GITPYTHON_AVAILABLE:
+            console.print("[red]GitPython is required for git operations. Please install with `pip install gitpython`.[/red]")
             return
-        
+
         # Security validation
         if not args.no_verify:
-            is_valid, message = self.security_validator.validate_url(args.repo_url, self.config.ALLOWED_URL_SCHEMES)
-            if not is_valid:
-                console.print(f"❌ {message}")
+            valid, msg = self.security_validator.validate_url(args.repo_url, self.config.ALLOWED_URL_SCHEMES or ["https", "git", "ssh"])
+            if not valid:
+                console.print(f"[red]Security validation failed: {msg}[/red]")
                 return
-        
-        # Determine folder name
+
         folder_name = args.name or args.repo_url.rstrip("/").split("/")[-1].removesuffix(".git")
         target_dir = self.config.COMMUNITY_COMMANDS_DIR / folder_name
-        
-        # Check if already exists
+
         if target_dir.exists() and not args.force:
-            console.print(f"⚠️ Command '{folder_name}' already exists. Use --force to overwrite.")
-            if not Confirm.ask("Overwrite existing command?", default=False):
-                return
-        
-        # Use lock to prevent concurrent installations
+            console.print(f"[yellow]Command '{folder_name}' already exists. Use --force to overwrite.[/yellow]")
+            return
+
         lock_file = self.config.CACHE_DIR / f"{folder_name}.install.lock"
-        
         with LockManager(lock_file):
-            if target_dir.exists():
-                console.print(f"🗑️ Removing existing installation...")
-                try:
-                    shutil.rmtree(target_dir)
-                except (OSError, PermissionError) as e:
-                    console.print(f"❌ Could not remove existing installation: {e}")
-                    return
-            
-            # Build git clone command
-            cmd = ["git", "clone"]
-            if not args.no_shallow:
-                cmd.extend(["--depth", "1"])
-            if args.branch:
-                cmd.extend(["--branch", args.branch])
-            cmd.extend([args.repo_url, str(target_dir)])
-            
             try:
-                if RICH_AVAILABLE:
-                    with Progress(
-                        SpinnerColumn(),
-                        TextColumn("[progress.description]{task.description}"),
-                        console=console
-                    ) as progress:
-                        task = progress.add_task(f"Installing '{folder_name}' from {args.repo_url}...", total=None)
-                        
-                        # Run with timeout
-                        result = subprocess.run(cmd, check=True, capture_output=True, text=True, 
-                                              timeout=self.config.MAX_INSTALL_TIME_SECONDS)
-                        
-                        progress.update(task, completed=True)
-                else:
-                    console.print(f"Installing '{folder_name}' from {args.repo_url}...")
-                    result = subprocess.run(cmd, check=True, capture_output=True, text=True, 
-                                          timeout=self.config.MAX_INSTALL_TIME_SECONDS)
-                
-                # After successful git clone, check for the new structure
-                commands_dir = target_dir / "commands"
-                if commands_dir.exists() and commands_dir.is_dir():
-                    # New structure found - validate all command files
-                    if not args.no_verify:
-                        for py_file in commands_dir.rglob("*.py"):
-                            is_safe, message = self.security_validator.validate_command_file(py_file)
-                            if not is_safe:
-                                console.print(f"❌ Security check failed for {py_file.name}: {message}")
-                                try:
-                                    shutil.rmtree(target_dir)
-                                except (OSError, PermissionError):
-                                    pass
-                                return
-                    
-                    command_count = len(list(commands_dir.glob("*.py")))
-                    console.print(f"✅ Found new command structure with {command_count} command(s)")
-                else:
-                    # Fall back to checking for main.py (legacy support)
-                    main_py = target_dir / "main.py"
-                    if not main_py.exists():
-                        # Look for alternative entry points
-                        py_files = list(target_dir.glob("*.py"))
-                        if not py_files:
-                            console.print(f"❌ No Python files found in repository")
-                            try:
-                                shutil.rmtree(target_dir)
-                            except (OSError, PermissionError):
-                                pass
-                            return
-                        
-                        console.print(f"⚠️ No main.py found. Available files: {[f.name for f in py_files]}")
-                    
-                    # Security validation of installed files
-                    if not args.no_verify:
-                        for py_file in target_dir.rglob("*.py"):
-                            is_safe, message = self.security_validator.validate_command_file(py_file)
-                            if not is_safe:
-                                console.print(f"❌ Security check failed for {py_file.name}: {message}")
-                                try:
-                                    shutil.rmtree(target_dir)
-                                except (OSError, PermissionError):
-                                    pass
-                                return
-                
-                # Save installation metadata
-                meta_data = {
-                    "repo_url": args.repo_url,
-                    "folder_name": folder_name,
-                    "installed_date": datetime.datetime.now().isoformat(),
-                    "last_updated": datetime.datetime.now().isoformat(),
-                    "shallow": not args.no_shallow,
-                    "branch": args.branch,
-                    "install_args": vars(args)
-                }
-                
-                try:
-                    meta_file = target_dir / self.config.GIT_META_FILE
-                    meta_file.write_text(json.dumps(meta_data, indent=2), encoding="utf-8")
-                except (IOError, OSError):
-                    console.print("⚠️ Warning: Could not save installation metadata")
-                
-                # Clear cache
-                try:
-                    self.cm.cache_manager.cache_file.unlink(missing_ok=True)
-                except (OSError, AttributeError):
-                    pass
-                
-                console.print(f"✅ Successfully installed: {folder_name}")
-                
-                # Show command info
-                try:
-                    self.info([folder_name])
-                except Exception:
-                    # Don't fail if info can't be shown
-                    pass
-                
-            except subprocess.TimeoutExpired:
-                console.print(f"❌ Installation timeout (>{self.config.MAX_INSTALL_TIME_SECONDS}s)")
-                if target_dir.exists():
-                    try:
-                        shutil.rmtree(target_dir)
-                    except (OSError, PermissionError):
-                        pass
-            except subprocess.CalledProcessError as e:
-                error_msg = e.stderr.strip() if e.stderr else str(e)
-                console.print(f"❌ Git error: {error_msg}")
-                if target_dir.exists():
-                    try:
-                        shutil.rmtree(target_dir)
-                    except (OSError, PermissionError):
-                        pass
+                if args.force and target_dir.exists():
+                    import shutil
+                    shutil.rmtree(target_dir)
+                clone_args = {}
+                if args.branch:
+                    clone_args['branch'] = args.branch
+                # Use GitPython to clone
+                git.Repo.clone_from(args.repo_url, str(target_dir), **clone_args)
+                console.print(f"[green]Successfully installed command from {args.repo_url} to {target_dir}[/green]")
             except Exception as e:
-                console.print(f"❌ Unexpected error during installation: {e}")
-                if target_dir.exists():
-                    try:
-                        shutil.rmtree(target_dir)
-                    except (OSError, PermissionError):
-                        pass
-    
+                console.print(f"[red]Git clone failed: {e}[/red]")
+
     def info(self, argv: list):
         """Show detailed information about a command."""
         formatter_class = rich_argparse.RichHelpFormatter if RICH_AVAILABLE else argparse.HelpFormatter
@@ -1382,17 +1258,13 @@ class BuiltinCommands:
         return "All required packages available"
     
     def _check_git(self, verbose: bool) -> str:
-        """Check if git is available and working."""
+        if not GITPYTHON_AVAILABLE:
+            return "GitPython not installed"
         try:
-            result = subprocess.run(['git', '--version'], capture_output=True, text=True, timeout=5)
-            if result.returncode != 0:
-                raise Exception("git command failed")
-            
-            version = result.stdout.strip()
-            return version if verbose else "Git available"
-            
-        except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.CalledProcessError):
-            raise Exception("Git not found or not working")
+            git_version = git.Git().version_info
+            return f"GitPython available, git version: {git_version}"
+        except Exception as e:
+            return f"GitPython error: {e}"
     
     def _check_cache(self, verbose: bool) -> str:
         """Check cache status and health."""
@@ -1631,9 +1503,9 @@ class BuiltinCommands:
         console.print(f"\n{summary}")
     
     def update(self, argv: list):
-        """Enhanced update command with better error handling."""
+        """Enhanced update command using GitPython."""
         formatter_class = rich_argparse.RichHelpFormatter if RICH_AVAILABLE else argparse.HelpFormatter
-        
+
         parser = argparse.ArgumentParser(
             prog="ppc update",
             description="Update a community command from its git repository",
@@ -1641,143 +1513,28 @@ class BuiltinCommands:
         )
         parser.add_argument("name", help="Name of command to update")
         parser.add_argument("--force", action="store_true", help="Force update even if no changes")
-        
+
         try:
             args = parser.parse_args(argv)
         except SystemExit:
             return
-        
+
+        if not GITPYTHON_AVAILABLE:
+            console.print("[red]GitPython is required for git operations. Please install with `pip install gitpython`.[/red]")
+            return
+
         target_dir = self.config.COMMUNITY_COMMANDS_DIR / args.name
-        
         if not target_dir.exists():
-            console.print(f"❌ Command not found: {args.name}")
+            console.print(f"[red]Command directory '{target_dir}' does not exist.[/red]")
             return
-        
-        meta_file = target_dir / self.config.GIT_META_FILE
-        if not meta_file.exists():
-            console.print(f"❌ Cannot update '{args.name}': Not installed via git.")
-            console.print(f"Hint: Only commands installed with 'ppc install' can be updated.")
-            return
-        
-        # Check if git is available
+
         try:
-            subprocess.run(["git", "--version"], check=True, capture_output=True, timeout=5)
-        except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
-            console.print("❌ Git is not installed or not accessible")
-            return
-        
-        try:
-            meta = json.loads(meta_file.read_text(encoding="utf-8"))
-            repo_url = meta.get("repo_url")
-            shallow = meta.get("shallow", True)
-            
-            if not repo_url:
-                console.print(f"❌ No repository URL found for '{args.name}'.")
-                return
-            
-            if RICH_AVAILABLE:
-                with Progress(
-                    SpinnerColumn(),
-                    TextColumn("[progress.description]{task.description}"),
-                    console=console
-                ) as progress:
-                    task = progress.add_task(f"Updating '{args.name}' from {repo_url}...", total=None)
-                    
-                    # Check if repository has changes
-                    try:
-                        fetch_cmd = ["git", "-C", str(target_dir), "fetch", "origin"]
-                        if shallow:
-                            fetch_cmd.extend(["--depth", "1"])
-                        
-                        subprocess.run(fetch_cmd, check=True, capture_output=True, text=True, timeout=60)
-                        
-                        # Check for updates
-                        status_result = subprocess.run(
-                            ["git", "-C", str(target_dir), "status", "-uno", "--porcelain"],
-                            check=True, capture_output=True, text=True, timeout=10
-                        )
-                        
-                        rev_list_result = subprocess.run(
-                            ["git", "-C", str(target_dir), "rev-list", "--count", "HEAD..origin/HEAD"],
-                            check=True, capture_output=True, text=True, timeout=10
-                        )
-                        
-                        commits_behind = int(rev_list_result.stdout.strip())
-                        
-                        if commits_behind == 0 and not args.force:
-                            progress.update(task, completed=True)
-                            console.print(f"✅ '{args.name}' is already up to date.")
-                            return
-                        
-                        # Reset to latest
-                        subprocess.run(
-                            ["git", "-C", str(target_dir), "reset", "--hard", "origin/HEAD"],
-                            check=True, capture_output=True, text=True, timeout=30
-                        )
-                        
-                        progress.update(task, completed=True)
-                    except Exception as e:
-                        raise Exception(f"Error during git update: {e}")
-            else:
-                console.print(f"Updating '{args.name}' from {repo_url}...")
-                
-                # Check if repository has changes
-                try:
-                    fetch_cmd = ["git", "-C", str(target_dir), "fetch", "origin"]
-                    if shallow:
-                        fetch_cmd.extend(["--depth", "1"])
-                    
-                    subprocess.run(fetch_cmd, check=True, capture_output=True, text=True, timeout=60)
-                    
-                    # Check for updates
-                    rev_list_result = subprocess.run(
-                        ["git", "-C", str(target_dir), "rev-list", "--count", "HEAD..origin/HEAD"],
-                        check=True, capture_output=True, text=True, timeout=10
-                    )
-                    
-                    commits_behind = int(rev_list_result.stdout.strip())
-                    
-                    if commits_behind == 0 and not args.force:
-                        console.print(f"✅ '{args.name}' is already up to date.")
-                        return
-                    
-                    # Reset to latest
-                    subprocess.run(
-                        ["git", "-C", str(target_dir), "reset", "--hard", "origin/HEAD"],
-                        check=True, capture_output=True, text=True, timeout=30
-                    )
-                    
-                except Exception as e:
-                    raise Exception(f"Error during git update: {e}")
-                
-            # Update metadata
-            meta["last_updated"] = datetime.datetime.now().isoformat()
-            try:
-                meta_file.write_text(json.dumps(meta, indent=2), encoding="utf-8")
-            except (IOError, OSError):
-                console.print("⚠️ Warning: Could not update metadata")
-            
-            # Clear cache
-            try:
-                self.cm.cache_manager.cache_file.unlink(missing_ok=True)
-            except (OSError, AttributeError):
-                pass
-            
-            if commits_behind > 0:
-                console.print(f"✅ Successfully updated '{args.name}' ({commits_behind} new commits)")
-            else:
-                console.print(f"✅ Force updated '{args.name}'")
-        
-        except json.JSONDecodeError:
-            console.print(f"❌ Error reading metadata for '{args.name}'.")
-        except subprocess.TimeoutExpired:
-            console.print(f"❌ Update timeout for '{args.name}'.")
-        except subprocess.CalledProcessError as e:
-            error_msg = e.stderr.strip() if e.stderr else str(e)
-            console.print(f"❌ Git error updating '{args.name}': {error_msg}")
+            repo = git.Repo(str(target_dir))
+            repo.remotes.origin.pull()
+            console.print(f"[green]Successfully updated command '{args.name}'.[/green]")
         except Exception as e:
-            console.print(f"❌ Unexpected error updating '{args.name}': {e}")
-    
+            console.print(f"[red]Git update failed: {e}[/red]")
+
     def test(self, argv: list):
         """Enhanced test command with better validation."""
         formatter_class = rich_argparse.RichHelpFormatter if RICH_AVAILABLE else argparse.HelpFormatter
