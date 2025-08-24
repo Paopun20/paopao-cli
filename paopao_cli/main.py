@@ -6,9 +6,9 @@ A plugin-based CLI system with built-in commands and community addons.
 
 # core import
 try:
-    import paopao_cli
+    from . import ppc_core
 except ImportError:
-    raise RuntimeError("PaoPao CLI core not found. You try del __init__.py file?")
+    raise RuntimeError("Bruh, PaoPao CLI core not found. You are remove __init__.py file?")
 
 # standard libraries
 import argparse
@@ -1972,7 +1972,7 @@ class PaoPaoCLI:
         
         # Fixed: Get version from our mock module
         try:
-            version_str = f"PaoPao CLI Framework v{paopao_cli.ppc_core.get_version()}"
+            version_str = f"PaoPao CLI Framework v{ppc_core.get_version()}"
         except AttributeError:
             version_str = "PaoPao CLI Framework v1.0.0-dev"
         
