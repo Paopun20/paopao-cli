@@ -5,3 +5,5 @@ build/*
 paopao_cli.egg-info/*
 __pycache__/*
 *.pyc
+*.log
+paopao_cli/.ppc_cache/*

@@ -276,7 +276,7 @@ def get_file_permissions(file_path: Path) -> str:
         
         return ''.join(perms)
     except (OSError, PermissionError):
-        return "?????????")
+        return "?????????"
 
 def load_gitignore_patterns(gitignore_path: Path):
     """Load .gitignore patterns if pathspec is available."""
@@ -475,12 +475,12 @@ def setup_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Enhanced directory tree visualization with icons and filtering.",
         epilog="""Examples:
-  %(prog)s                          # Show current directory
-  %(prog)s /path/to/dir             # Show specific directory
-  %(prog)s --show-hidden            # Include hidden files
-  %(prog)s --use-gitignore .gitignore  # Use .gitignore filtering
-  %(prog)s --max-depth 2            # Limit depth to 2 levels
-  %(prog)s --show-size --show-permissions  # Show detailed info
+  ppc treeview                          # Show current directory
+  ppc treeview /path/to/dir             # Show specific directory
+  ppc treeview --show-hidden            # Include hidden files
+  ppc treeview --use-gitignore .gitignore  # Use .gitignore filtering
+  ppc treeview --max-depth 2            # Limit depth to 2 levels
+  ppc treeview --show-size --show-permissions  # Show detailed info
         """,
         formatter_class=argparse.RawTextHelpFormatter
     )

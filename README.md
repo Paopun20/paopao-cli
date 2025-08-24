@@ -1,59 +1,350 @@
-
 ![PaoPao Logo](./docs/ppc_icon.png)
 
 # 🥭 PaoPao CLI Framework
-A versatile and **user-friendly Command Line Interface (CLI) framework** designed to simplify your terminal workflow.
-It comes with **built-in commands**, **community plugins**, and **extensible architecture**, perfect for both beginners and advanced users.
+
+A **powerful, secure, and extensible Command Line Interface (CLI) framework** designed to revolutionize your terminal workflow. Built with Python, it offers advanced plugin management, security features, and a rich user experience.
+
+[![Python 3.6+](https://img.shields.io/badge/python-3.6+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/Apache-2.0)
 
 ---
 
-## ⚡ Features
-- 🛠️ Built-in commands: install, uninstall, list, update, test  
-- 🌍 Community commands: easily install and manage third-party CLI extensions  
-- 🐍 Python-based: lightweight and extensible  
-- 📦 Plugin architecture: add new commands without touching core code  
-- 🧪 Test local commands before publishing  
-- 🔄 Update installed commands from Git repositories  
-- 📝 Rich terminal output using **Rich** library (tables, panels, colors)
+## ⚡ Core Features
+
+### 🛠️ **Built-in Commands**
+| Command | Description | Enhanced Features |
+|---------|-------------|-------------------|
+| `install` | Install community commands | Security validation, branch selection, force overwrite |
+| `uninstall` | Remove commands | Interactive confirmation, metadata cleanup |
+| `list` | Show installed commands | Advanced filtering, sorting, detailed view |
+| `update` | Update commands from Git | Change detection, force update option |
+| `info` | Show command details | Complete metadata, dependency info |
+| `search` | Find commands | Search by name, description, author |
+| `test` | Test local commands | Security validation, timeout control |
+| `doctor` | System health check | Comprehensive diagnostics, verbose mode |
+| `repl` | experiment featerimental feature, interactive shell | Interactive Python shell for command development and testing |
+
+### 🌍 **Community Integration**
+- **Git repository support** (GitHub, GitLab, Bitbucket, Codeberg)
+- **Automatic metadata extraction** from project files
+- **Dependency management** and validation
+- **Version tracking** with installation history
+- **Shallow cloning** for faster installations
+
+### 🔒 **Security Features**
+- **URL scheme validation** (prevents local file access)
+- **Suspicious pattern detection** in repositories
+- **Code analysis** for potentially dangerous imports
+- **User confirmation** for risky operations
+- **File size limits** (10MB max per file)
 
 ---
 
 ## 🥭 Installation
-Install the latest version directly from GitHub:
+
+### Quick Install
 ```bash
 pip install git+https://github.com/Paopun20/paopao-cli.git
 ```
+
+### Development Install
+```bash
+git clone https://github.com/Paopun20/paopao-cli.git
+cd paopao-cli
+pip install -e .
+```
+
+### Requirements
+- **Python 3.6+**
+- **Git** (for community commands)
+- **Rich** (for enhanced terminal output)
+- **rich-argparse** (for beautiful help pages)
+
 ---
 
-## 🚀 Usage
-Run commands using the `ppc` CLI:
+## 🚀 Quick Start
 
-ppc <command> [options]
+### Basic Usage
+```bash
+# Show all available commands
+ppc
 
-### Examples
-- Install a community command:  
-```bash
-ppc install https://github.com/user/my-command
+# Get detailed help
+ppc --help
+
+# Check system health
+ppc doctor
 ```
-- List installed community commands:  
+
+### Installing Community Commands
 ```bash
-ppc list
+# Install from GitHub
+ppc install https://github.com/user/awesome-command
+
+# Install specific branch
+ppc install https://github.com/user/command --branch develop
+
+# Install with custom name
+ppc install https://github.com/user/tool --name mytool
+
+# Force overwrite existing command
+ppc install https://github.com/user/command --force
 ```
-- Test a local command script:  
+
+### Managing Commands
 ```bash
-ppc test --file main.py -- arg1 arg2
-```
-- Update a command from its Git repository:  
-```bash
+# List all commands with details
+ppc list --detailed
+
+# List only community commands
+ppc list --source community
+
+# Sort by installation date
+ppc list --sort installed --reverse
+
+# Search for commands
+ppc search "git"
+ppc search "deploy" --source community
+
+# Show detailed command info
+ppc info my-command
+
+# Update a command
 ppc update my-command
+
+# Uninstall with confirmation
+ppc uninstall old-command
+```
+
+### Development & Testing
+```bash
+# Test a local command script
+ppc test --file my_script.py
+
+# Test with security validation
+ppc test --file script.py --validate --timeout 60
+
+# Test with arguments
+ppc test --file deploy.py -- --env production --dry-run
 ```
 
 ---
 
-## 💡 Tips
-- Use `ppc` without arguments to see **all available commands**  
-- Community commands override official ones if they share the same name  
-- Emoji icons help quickly identify command types:  
-  - 🛠️ Official commands  
-  - 🌍 Community commands  
-  - 📥 Install / 🗑️ Uninstall / 🔄 Update / 🧪 Test  
+## 📁 Project Structure
+
+```
+paopao-cli/
+├── ppc_commands/          # Official commands
+├── ppc_addon/            # Community commands
+├── .ppc_cache/           # Cache and metadata
+├── docs/                 # Documentation
+└── main.py              # Core framework
+```
+
+### Command Structure
+```
+my-command/
+├── main.py              # Entry point (required)
+├── ppc.project.json     # Project metadata
+├── .ppc.git            # Git installation info
+├── requirements.txt     # Dependencies (optional)
+└── README.md           # Documentation (optional)
+```
+
+---
+
+## 🔧 Advanced Configuration
+
+### Project Metadata (`ppc.project.json`)
+```json
+{
+  "name": "awesome-tool",
+  "version": "1.2.0",
+  "author": "Your Name",
+  "description": "An awesome command-line tool",
+  "python_version": "3.7+",
+  "dependencies": ["requests", "click"],
+  "keywords": ["automation", "productivity"],
+  "homepage": "https://github.com/user/awesome-tool"
+}
+```
+
+### Environment Configuration
+```python
+# Custom configuration
+class CustomConfig(Config):
+    CACHE_EXPIRY_HOURS = 12  # Shorter cache
+    MAX_INSTALL_TIME_SECONDS = 600  # 10 minutes timeout
+    ALLOWED_URL_SCHEMES = ["https", "ssh"]  # HTTPS and SSH only
+```
+
+---
+
+## 🛡️ Security Guidelines
+
+### For Users
+- **Review code** before installing community commands
+- **Use trusted sources** (GitHub, GitLab, etc.)
+- **Enable validation** with `--validate` flag during testing
+- **Regular updates** keep commands secure
+
+### For Developers
+- **Minimize dependencies** in your commands
+- **Avoid dangerous imports** (subprocess, eval, etc.)
+- **Include metadata** in `ppc.project.json`
+- **Document security implications** in your README
+
+---
+
+## 🔍 Troubleshooting
+
+### Common Issues
+
+**Command not found after installation?**
+```bash
+# Refresh command cache
+ppc doctor
+# Or force cache refresh
+ppc list --detailed
+```
+
+**Installation timeout?**
+```bash
+# Increase timeout for large repositories
+ppc install https://github.com/large/repo --no-shallow
+```
+
+**Permission errors?**
+```bash
+# Check directory permissions
+ppc doctor --verbose
+```
+
+**Git errors?**
+```bash
+# Verify git installation
+git --version
+# Check network connectivity
+ppc install https://github.com/test/repo
+```
+
+### System Health Check
+```bash
+# Comprehensive system check
+ppc doctor --verbose
+
+# Check specific components
+ppc doctor  # Basic check
+```
+
+---
+
+## 🤝 Contributing
+
+### Creating Commands
+1. **Fork** a template or create from scratch
+2. **Implement** `main(argv)` function in `main.py`
+3. **Add metadata** in `ppc.project.json`
+4. **Test locally** with `ppc test`
+5. **Publish** to Git repository
+
+### Command Template
+```python
+#!/usr/bin/env python3
+"""
+My Awesome Command
+"""
+
+import argparse
+from rich.console import Console
+
+console = Console()
+
+def main(argv):
+    parser = argparse.ArgumentParser(description="My awesome command")
+    parser.add_argument("--option", help="An option")
+    
+    args = parser.parse_args(argv)
+    
+    console.print("[green]Hello from my awesome command![/green]")
+    
+    if args.option:
+        console.print(f"Option value: {args.option}")
+
+if __name__ == "__main__":
+    import sys
+    main(sys.argv[1:])
+```
+
+---
+
+## 📚 Examples
+
+### Daily Workflow Commands
+```bash
+# Development workflow
+ppc install https://github.com/dev/git-tools
+ppc install https://github.com/dev/docker-helper
+ppc install https://github.com/dev/deploy-scripts
+
+# System administration
+ppc install https://github.com/admin/server-monitor
+ppc install https://github.com/admin/backup-tools
+
+# Productivity tools
+ppc install https://github.com/tools/time-tracker
+ppc install https://github.com/tools/note-manager
+```
+
+### Automation Scripts
+```bash
+# Install build tools
+ppc install https://github.com/ci/build-pipeline
+
+# Use the installed command
+ppc build-pipeline --env staging --notify slack
+```
+
+---
+
+## 🏷️ Version History
+
+### v2.0.0 (Enhanced Edition)
+- ✅ **Security framework** with validation
+- ✅ **Performance improvements** with caching
+- ✅ **Enhanced user experience** with Rich UI
+- ✅ **System diagnostics** with `doctor` command
+- ✅ **Advanced command management**
+- ✅ **Comprehensive error handling**
+
+### v1.0.0 (Original)
+- ✅ Basic command management
+- ✅ Git repository integration
+- ✅ Plugin architecture
+- ✅ Rich terminal output
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 💬 Support
+
+- 🐛 **Issues**: [GitHub Issues](https://github.com/Paopun20/paopao-cli/issues)
+- 💡 **Discussions**: [GitHub Discussions](https://github.com/Paopun20/paopao-cli/discussions)
+
+---
+
+## 🌟 Acknowledgments
+
+- **Rich** library for beautiful terminal output
+- **Python** community for excellent tooling
+- **Git** for reliable version control
+- **Open Source** contributors worldwide
+
+---
+
+*Built with ❤️ by the PaoPao development team*

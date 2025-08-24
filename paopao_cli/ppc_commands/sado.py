@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+"""
+🥭 SADO — Super Administrator Do
+Run any command with TrustedInstaller privileges.
+"""
+
 import argparse
 import subprocess
 import sys
@@ -7,370 +13,365 @@ import time
 import logging
 from pathlib import Path
 from typing import List, Optional
-import shlex
 
 from rich.console import Console
 from rich.panel import Panel
-from rich.prompt import Confirm
+from rich.prompt import Confirm, Prompt
 from rich.syntax import Syntax
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
+from rich.table import Table
 from rich.text import Text
-from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.align import Align
+from rich.columns import Columns
+from rich.tree import Tree
+from rich.layout import Layout
+from rich.live import Live
+from rich.status import Status
 from rich import box
+from rich.markdown import Markdown
 
+# Initialize Rich console
 console = Console()
 
-# Configure logging
+# ─────────────────────────────────────────────────────────────────────────────
+# Configuration & Logging
+# ─────────────────────────────────────────────────────────────────────────────
+class SADOConfig:
+    VERSION = "1.0.0"
+    APP_NAME = "SADO"
+    FULL_NAME = "Super Administrator Do"
+    EMOJI = "🥭"
+
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('sado.log'),
-        logging.StreamHandler()
-    ]
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
 )
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("sado")
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Configuration and Constants
+# Rich UI Components
 # ─────────────────────────────────────────────────────────────────────────────
-
-class Config:
-    """Configuration settings for SADO."""
-    LOG_FILE = "sado.log"
-    TRUSTED_INSTALLER_SERVICE = "TrustedInstaller"
-    POWERSHELL_TIMEOUT = 30
-    MAX_COMMAND_LENGTH = 2000
+class SADOUI:
+    def __init__(self):
+        self.console = console
+        
+    def clear_screen(self):
+        """Clear the terminal screen"""
+        self.console.clear()
     
-    # Dangerous commands that require extra confirmation
-    DANGEROUS_COMMANDS = {
-        'rm', 'del', 'rmdir', 'rd', 'format', 'fdisk', 'diskpart',
-        'reg delete', 'takeown', 'icacls', 'attrib', 'sfc /scannow'
-    }
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Custom Exceptions
-# ─────────────────────────────────────────────────────────────────────────────
-
-class SADOError(Exception):
-    """Base exception for SADO operations."""
-    pass
-
-class ElevationError(SADOError):
-    """Raised when elevation fails."""
-    pass
-
-class PowerShellError(SADOError):
-    """Raised when PowerShell operations fail."""
-    pass
-
-class TrustedInstallerError(SADOError):
-    """Raised when TrustedInstaller operations fail."""
-    pass
-
-# ─────────────────────────────────────────────────────────────────────────────
-# UI Helpers
-# ─────────────────────────────────────────────────────────────────────────────
-
-def header():
-    """Display application header."""
-    title = Text("SADO — Super Administrator Do", style="bold white on green", justify="center")
-    console.clear()
-    console.rule(title)
-
-def show_panel(message: str, title: str = "Notice", style: str = "cyan"):
-    """Display a styled panel with message."""
-    console.print(Panel(message, title=f"[{style}]{title}[/{style}]", border_style=style, box=box.ROUNDED))
-
-def show_rich_warning():
-    """Display TrustedInstaller warning."""
-    msg = ("[bold red]⚠️  CRITICAL WARNING ⚠️[/bold red]\n\n"
-           "[bold]You are about to execute commands as TrustedInstaller.[/bold]\n\n"
-           "• This is the highest privilege level in Windows\n"
-           "• Commands can bypass ALL security restrictions\n"
-           "• Incorrect usage can render your system unbootable\n"
-           "• Only proceed if you fully understand the consequences\n\n"
-           "[bold yellow]This action is logged and traceable.[/bold yellow]")
-    show_panel(msg, title="DANGER ZONE", style="red")
-
-def show_error(title: str, message: str):
-    """Display error panel."""
-    console.print(Panel(message, title=f"[red]{title}[/red]", border_style="red", box=box.ROUNDED))
-    logger.error(f"{title}: {message}")
-
-def show_command_preview(command: List[str]):
-    """Display command preview with syntax highlighting."""
-    command_str = ' '.join(shlex.quote(arg) for arg in command)
+    def show_header(self):
+        """Display the application header with branding"""
+        self.clear_screen()
+        
+        # Create title with emoji and styling
+        title_text = Text()
+        title_text.append(f"{SADOConfig.EMOJI} ", style="bold green")
+        title_text.append(f"{SADOConfig.APP_NAME}", style="bold white on green")
+        title_text.append(" — ", style="bold green")
+        title_text.append(f"{SADOConfig.FULL_NAME}", style="bold white on green")
+        title_text.append(f" v{SADOConfig.VERSION}", style="dim white")
+        
+        self.console.print()
+        self.console.print(Align.center(title_text))
+        self.console.rule(style="green", characters="─")
+        self.console.print()
     
-    # Truncate very long commands
-    if len(command_str) > Config.MAX_COMMAND_LENGTH:
-        command_str = command_str[:Config.MAX_COMMAND_LENGTH] + "... [TRUNCATED]"
+    def show_system_info(self):
+        """Display system information table"""
+        table = Table(title="System Information", box=box.ROUNDED, border_style="blue")
+        table.add_column("Property", style="cyan", width=20)
+        table.add_column("Value", style="white")
+        
+        table.add_row("Platform", os.name.upper())
+        table.add_row("Python Version", f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
+        table.add_row("Admin Status", "✅ Administrator" if self.is_admin() else "❌ Standard User")
+        table.add_row("Working Directory", str(Path.cwd()))
+        
+        self.console.print(table)
+        self.console.print()
     
-    syntax = Syntax(command_str, "powershell", theme="monokai", word_wrap=True)
-    console.print(Panel(syntax, title="[bold blue]Command Preview[/bold blue]", border_style="blue", box=box.ROUNDED))
+    def show_panel(self, message: str, title: str = "Notice", style: str = "cyan", 
+                   subtitle: Optional[str] = None) -> None:
+        """Display a styled panel with message"""
+        panel = Panel(
+            message,
+            title=f"[{style}]{title}[/{style}]",
+            subtitle=subtitle,
+            border_style=style,
+            box=box.ROUNDED,
+            padding=(1, 2)
+        )
+        self.console.print(panel)
+        self.console.print()
+    
+    def show_warning_panel(self):
+        """Display the TrustedInstaller warning"""
+        warning_text = Text()
+        warning_text.append("⚠️  ", style="bold red")
+        warning_text.append("DANGER ZONE", style="bold red")
+        warning_text.append(" ⚠️\n\n", style="bold red")
+        warning_text.append("You are about to run commands with ", style="white")
+        warning_text.append("TrustedInstaller", style="bold yellow")
+        warning_text.append(" privileges.\n\n", style="white")
+        warning_text.append("This is the highest permission level in Windows and can:\n", style="white")
+        warning_text.append("• Modify critical system files\n", style="red")
+        warning_text.append("• Break Windows functionality\n", style="red")
+        warning_text.append("• Cause permanent system damage\n", style="red")
+        warning_text.append("\nOnly proceed if you understand the risks!", style="bold white")
+        
+        panel = Panel(
+            warning_text,
+            title="[bold red]⚠️  CRITICAL WARNING  ⚠️[/]",
+            border_style="red",
+            box=box.DOUBLE,
+            padding=(1, 2)
+        )
+        self.console.print(panel)
+    
+    def show_command_preview(self, command: List[str]):
+        """Display the command that will be executed"""
+        command_str = ' '.join(command)
+        
+        # Create syntax highlighted command
+        syntax = Syntax(
+            command_str, 
+            "powershell", 
+            theme="monokai", 
+            word_wrap=True,
+            line_numbers=False,
+            background_color="default"
+        )
+        
+        # Create info table
+        info_table = Table(box=None, show_header=False, padding=(0, 1))
+        info_table.add_column("Key", style="cyan")
+        info_table.add_column("Value", style="white")
+        info_table.add_row("Command:", command[0])
+        info_table.add_row("Arguments:", ' '.join(command[1:]) if len(command) > 1 else "None")
+        info_table.add_row("Privilege Level:", "[bold red]TrustedInstaller[/]")
+        
+        # Combine in columns
+        command_panel = Panel(
+            syntax,
+            title="[bold blue]Command to Execute[/]",
+            border_style="blue",
+            box=box.ROUNDED
+        )
+        
+        info_panel = Panel(
+            info_table,
+            title="[bold cyan]Execution Details[/]",
+            border_style="cyan",
+            box=box.ROUNDED
+        )
+        
+        self.console.print(Columns([command_panel, info_panel], equal=True))
+        self.console.print()
+    
+    def show_error(self, title: str, message: str, details: Optional[str] = None):
+        """Display an error message with optional details"""
+        error_text = Text()
+        error_text.append("❌ ", style="bold red")
+        error_text.append(message, style="white")
+        
+        if details:
+            error_text.append("\n\n")
+            error_text.append("Details:\n", style="bold white")
+            error_text.append(details, style="dim white")
+        
+        panel = Panel(
+            error_text,
+            title=f"[bold red]{title}[/]",
+            border_style="red",
+            box=box.ROUNDED,
+            padding=(1, 2)
+        )
+        self.console.print(panel)
+    
+    def show_success(self, message: str):
+        """Display a success message"""
+        success_text = Text()
+        success_text.append("✅ ", style="bold green")
+        success_text.append(message, style="white")
+        
+        panel = Panel(
+            success_text,
+            title="[bold green]Success[/]",
+            border_style="green",
+            box=box.ROUNDED,
+            padding=(1, 2)
+        )
+        self.console.print(panel)
+    
+    def show_progress_task(self, description: str):
+        """Show a progress spinner for a task"""
+        with Status(f"[cyan]{description}[/cyan]", spinner="dots") as status:
+            return status
+    
+    def confirm_action(self, message: str, default: bool = False) -> bool:
+        """Ask for user confirmation with Rich styling"""
+        return Confirm.ask(
+            f"[bold yellow]{message}[/bold yellow]",
+            default=default
+        )
+    
+    def prompt_input(self, message: str, default: Optional[str] = None) -> str:
+        """Get user input with Rich styling"""
+        return Prompt.ask(
+            f"[bold blue]{message}[/bold blue]",
+            default=default
+        )
+    
+    def show_help_panel(self):
+        """Display help information"""
+        help_md = """
+# SADO Usage Examples
 
-def check_dangerous_command(command: List[str]) -> bool:
-    """Check if command contains dangerous operations."""
-    command_str = ' '.join(command).lower()
-    return any(dangerous in command_str for dangerous in Config.DANGEROUS_COMMANDS)
+## Basic Commands
+```bash
+sado powershell -Command "Stop-Service wuauserv"
+sado cmd /c "echo Hello from TrustedInstaller"
+sado reg delete "HKLM\\SOFTWARE\\MyKey" /f
+```
+
+## Advanced Usage
+```bash
+# Disable Windows Update (requires restart)
+sado powershell -Command "Set-Service wuauserv -StartupType Disabled"
+
+# Modify system files
+sado takeown /f "C:\\Windows\\System32\\example.dll"
+
+# Registry operations
+sado reg add "HKLM\\SYSTEM\\CurrentControlSet\\Services\\MyService" /v Start /t REG_DWORD /d 4
+```
+
+## Safety Tips
+- Always test commands on a virtual machine first
+- Create system restore point before making changes
+- Keep backups of modified files
+- Use the preview feature to verify commands
+        """
+        
+        self.console.print(Markdown(help_md))
+    
+    @staticmethod
+    def is_admin() -> bool:
+        """Check if running with administrator privileges"""
+        try:
+            return ctypes.windll.shell32.IsUserAnAdmin()
+        except Exception:
+            return False
 
 # ─────────────────────────────────────────────────────────────────────────────
-# System Validation
+# Core Functionality
 # ─────────────────────────────────────────────────────────────────────────────
-
-def validate_system():
-    """Validate system requirements."""
-    # Check Windows version
-    if sys.platform != "win32":
-        raise SADOError("This tool only works on Windows systems.")
+class SADOCore:
+    def __init__(self):
+        self.ui = SADOUI()
     
-    # Check Python version
-    if sys.version_info < (3, 8):
-        raise SADOError("Python 3.8 or higher is required.")
-    
-    # Check if running in compatible environment
-    if not os.path.exists(os.environ.get('SYSTEMROOT', r'C:\Windows')):
-        raise SADOError("Windows system directory not found.")
-
-def is_admin() -> bool:
-    """Check if running with administrator privileges."""
-    try:
-        return ctypes.windll.shell32.IsUserAnAdmin()
-    except Exception as e:
-        logger.error(f"Failed to check admin status: {e}")
-        return False
-
-def validate_command(command: List[str]) -> None:
-    """Validate command before execution."""
-    if not command:
-        raise ValueError("Command cannot be empty.")
-    
-    if len(command[0]) == 0:
-        raise ValueError("Command executable cannot be empty.")
-    
-    # Check for null bytes or other injection attempts
-    command_str = ' '.join(command)
-    if '\x00' in command_str:
-        raise ValueError("Command contains null bytes.")
-    
-    # Check command length
-    if len(command_str) > Config.MAX_COMMAND_LENGTH:
-        raise ValueError(f"Command exceeds maximum length of {Config.MAX_COMMAND_LENGTH} characters.")
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Elevation and PowerShell Setup
-# ─────────────────────────────────────────────────────────────────────────────
-
-def elevate_with_admin():
-    """Restart script with administrator privileges."""
-    try:
+    def elevate_with_admin(self):
+        """Elevate to administrator privileges"""
         script = os.path.abspath(sys.argv[0])
         args = " ".join(f'"{arg}"' for arg in sys.argv[1:])
+        command = f"Start-Process -FilePath 'python.exe' -ArgumentList '{script} {args}' -Verb RunAs"
         
-        # Use PowerShell to elevate with better error handling
-        ps_command = (
-            f"try {{ "
-            f"Start-Process -FilePath 'python.exe' -ArgumentList '{script} {args}' -Verb RunAs -Wait; "
-            f"}} catch {{ "
-            f"Write-Error $_.Exception.Message; "
-            f"exit 1; "
-            f"}}"
-        )
-        
-        result = subprocess.run(
-            ['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', ps_command],
-            capture_output=True,
-            text=True,
-            timeout=Config.POWERSHELL_TIMEOUT,
-            creationflags=subprocess.CREATE_NEW_CONSOLE
-        )
-        
-        if result.returncode != 0:
-            error_msg = result.stderr.strip() or "User declined elevation or elevation was blocked."
-            raise ElevationError(error_msg)
-            
-        sys.exit(result.returncode)
-        
-    except subprocess.TimeoutExpired:
-        raise ElevationError("Elevation request timed out.")
-    except Exception as e:
-        raise ElevationError(f"Failed to elevate privileges: {e}")
-
-def check_powershell():
-    """Verify PowerShell is available and functional."""
-    try:
-        result = subprocess.run(
-            ["powershell", "-NoProfile", "-Command", "$PSVersionTable.PSVersion.Major"],
-            capture_output=True,
-            text=True,
-            timeout=Config.POWERSHELL_TIMEOUT,
-            creationflags=subprocess.CREATE_NO_WINDOW
-        )
-        
-        if result.returncode != 0:
-            raise PowerShellError(f"PowerShell check failed: {result.stderr}")
-        
-        # Check PowerShell version
         try:
-            ps_version = int(result.stdout.strip())
-            if ps_version < 5:
-                logger.warning(f"PowerShell version {ps_version} detected. Version 5+ recommended.")
-        except ValueError:
-            logger.warning("Could not determine PowerShell version.")
+            with self.ui.show_progress_task("Requesting elevation..."):
+                result = subprocess.run(
+                    ['powershell.exe', '-NoProfile', '-NonInteractive', '-Command', command],
+                    capture_output=True, text=True,
+                    creationflags=subprocess.CREATE_NEW_CONSOLE
+                )
             
-    except subprocess.TimeoutExpired:
-        raise PowerShellError("PowerShell check timed out.")
-    except FileNotFoundError:
-        raise PowerShellError("PowerShell not found. Please install Windows PowerShell.")
-
-def install_ntobjectmanager():
-    """Install or verify NtObjectManager module."""
-    try:
-        # Check if module is available
-        check_result = subprocess.run(
-            ["powershell", "-NoProfile", "-Command", 
-             "Get-Module -ListAvailable -Name NtObjectManager | Select-Object -ExpandProperty Name"],
-            capture_output=True,
-            text=True,
-            timeout=Config.POWERSHELL_TIMEOUT,
-            creationflags=subprocess.CREATE_NO_WINDOW
-        )
-        
-        if "NtObjectManager" not in check_result.stdout:
-            console.print("[yellow]Installing NtObjectManager module...[/yellow]")
+            if result.returncode != 0:
+                self.ui.show_error(
+                    "Elevation Failed", 
+                    "User canceled elevation or it was blocked by system policy."
+                )
+            sys.exit(result.returncode)
             
-            install_result = subprocess.run([
-                "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
-                "try { "
-                "Install-Module NtObjectManager -Force -Scope CurrentUser -AllowClobber -AcceptLicense; "
-                "Write-Output 'Success'; "
-                "} catch { "
-                "Write-Error $_.Exception.Message; "
-                "exit 1; "
-                "}"
-            ],
-            capture_output=True,
-            text=True,
-            timeout=60,  # Installation can take longer
-            creationflags=subprocess.CREATE_NO_WINDOW
+        except Exception as e:
+            self.ui.show_error("Elevation Failed", str(e))
+            sys.exit(1)
+    
+    def check_powershell(self):
+        """Verify PowerShell is available and functional"""
+        with self.ui.show_progress_task("Checking PowerShell availability..."):
+            result = subprocess.run(
+                ["powershell", "-Command", "Get-Host"],
+                capture_output=True, text=True
             )
+            if result.returncode != 0:
+                raise RuntimeError("PowerShell execution failed or is not available.")
+    
+    def install_ntobjectmanager(self):
+        """Install NtObjectManager module if not present"""
+        with self.ui.show_progress_task("Checking NtObjectManager module..."):
+            result = subprocess.run(
+                ["powershell", "-Command", "Get-Module -ListAvailable -Name NtObjectManager"],
+                capture_output=True, text=True
+            )
+        
+        if "NtObjectManager" not in result.stdout:
+            with self.ui.show_progress_task("Installing NtObjectManager module..."):
+                install_result = subprocess.run([
+                    "powershell", "-Command",
+                    "Install-Module NtObjectManager -Force -Scope CurrentUser -AllowClobber"
+                ])
+                if install_result.returncode != 0:
+                    raise RuntimeError("Failed to install NtObjectManager module.")
             
-            if install_result.returncode != 0:
-                raise PowerShellError(f"Failed to install NtObjectManager: {install_result.stderr}")
-            
-            console.print("[green]✓ NtObjectManager installed successfully.[/green]")
+            self.ui.show_success("NtObjectManager module installed successfully.")
         else:
-            console.print("[green]✓ NtObjectManager is already available.[/green]")
-            
-    except subprocess.TimeoutExpired:
-        raise PowerShellError("NtObjectManager installation timed out.")
-
-def check_trustedinstaller_service():
-    """Verify TrustedInstaller service is available."""
-    try:
-        result = subprocess.run([
-            "powershell", "-NoProfile", "-Command",
-            f"Get-Service -Name {Config.TRUSTED_INSTALLER_SERVICE} -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Status"
-        ],
-        capture_output=True,
-        text=True,
-        timeout=Config.POWERSHELL_TIMEOUT,
-        creationflags=subprocess.CREATE_NO_WINDOW
-        )
-        
-        if not result.stdout.strip():
-            raise TrustedInstallerError("TrustedInstaller service not found.")
-        
-        logger.info(f"TrustedInstaller service status: {result.stdout.strip()}")
-        
-    except subprocess.TimeoutExpired:
-        raise TrustedInstallerError("TrustedInstaller service check timed out.")
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Command Execution as TrustedInstaller
-# ─────────────────────────────────────────────────────────────────────────────
-
-def run_as_trustedinstaller(command: List[str]):
-    """Execute command with TrustedInstaller privileges."""
-    validate_command(command)
+            logger.info("NtObjectManager module is already available.")
     
-    # Log the command execution attempt
-    logger.info(f"Attempting to run command as TrustedInstaller: {' '.join(command)}")
-    
-    # Properly escape the command for PowerShell
-    base_command = subprocess.list2cmdline(command)
-    
-    # Create warning message for the spawned console
-    warning_msg = (
-        "echo [WARNING] Running as TrustedInstaller - System integrity at risk! && "
-        "echo Press Ctrl+C to abort, or any key to continue && pause >nul && "
-    )
-    
-    # Construct the full command with warning
-    full_command = f'cmd.exe /c "{warning_msg}{base_command}"'
-    
-    # Escape for PowerShell
-    escaped_command = full_command.replace('"', '`"').replace("'", "''")
-    
-    # PowerShell script to run as TrustedInstaller
-    ps_script = f"""
-    try {{
+    def run_as_trustedinstaller(self, command: List[str]):
+        """Execute command with TrustedInstaller privileges"""
+        base_command = subprocess.list2cmdline(command)
+        ps_script = f"""
         Set-ExecutionPolicy Bypass -Scope Process -Force;
         Import-Module NtObjectManager -Force;
-        
-        # Start TrustedInstaller service if not running
-        $service = Get-Service -Name TrustedInstaller -ErrorAction Stop;
-        if ($service.Status -ne 'Running') {{
-            Start-Service -Name TrustedInstaller -ErrorAction Stop;
-            Start-Sleep -Seconds 2;
+        sc.exe start TrustedInstaller | Out-Null;
+        Start-Sleep -Seconds 2;
+        $proc = Get-NtProcess -Name TrustedInstaller.exe -ErrorAction SilentlyContinue;
+        if (-not $proc) {{ 
+            Write-Error 'TrustedInstaller service not found or not running'; 
+            exit 1; 
         }}
+        Write-Host "Launching command with TrustedInstaller privileges...";
+        New-Win32Process "cmd.exe /c {base_command}" -CreationFlags NewConsole -ParentProcess $proc[0];
+        Write-Host "Command launched successfully.";
+        """
         
-        # Get TrustedInstaller process
-        $proc = Get-NtProcess -Name TrustedInstaller.exe -ErrorAction Stop;
-        if (-not $proc) {{
-            throw 'TrustedInstaller process not found after service start';
-        }}
-        
-        # Launch command in new console with TrustedInstaller privileges
-        New-Win32Process '{escaped_command}' -CreationFlags NewConsole -ParentProcess $proc[0] -ErrorAction Stop;
-        Write-Output 'Command launched successfully';
-        
-    }} catch {{
-        Write-Error "Failed to execute as TrustedInstaller: $($_.Exception.Message)";
-        exit 1;
-    }}
-    """
-    
-    try:
-        result = subprocess.run(
-            ['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', ps_script],
-            capture_output=True,
-            text=True,
-            timeout=Config.POWERSHELL_TIMEOUT,
-            creationflags=subprocess.CREATE_NEW_CONSOLE | subprocess.CREATE_NO_WINDOW
-        )
+        with self.ui.show_progress_task("Executing command as TrustedInstaller..."):
+            result = subprocess.run(
+                ['powershell', '-NoProfile', '-NonInteractive', '-Command', ps_script],
+                capture_output=True, text=True
+            )
         
         if result.returncode != 0:
             error_msg = result.stderr.strip() or "Unknown error occurred during execution."
-            logger.error(f"TrustedInstaller execution failed: {error_msg}")
-            raise TrustedInstallerError(error_msg)
+            raise RuntimeError(error_msg)
         
-        logger.info("Command launched successfully as TrustedInstaller")
-        
-    except subprocess.TimeoutExpired:
-        raise TrustedInstallerError("Command execution timed out.")
+        return result.stdout
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Main Application Logic
+# Main Application
 # ─────────────────────────────────────────────────────────────────────────────
-
-def setup_argument_parser() -> argparse.ArgumentParser:
-    """Set up command line argument parser."""
+def main(argv):
+    core = SADOCore()
+    ui = core.ui
+    
+    # Parse arguments
     parser = argparse.ArgumentParser(
-        description="Run any command with TrustedInstaller privileges.",
-        epilog="""Examples:
-  python sado.py powershell -Command "Stop-Service -Name wuauserv"
-  python sado.py cmd /c "takeown /f C:\\Windows\\System32\\test.dll"
-  python sado.py --no-warning reg delete "HKLM\\SOFTWARE\\Test" /f
+        description=f"{SADOConfig.APP_NAME} - {SADOConfig.FULL_NAME}",
+        epilog="""
+Examples:
+  sado powershell -Command "Stop-Service wuauserv"
+  sado cmd /c "echo Hello from TrustedInstaller"
+  sado --help-extended  # Show detailed help with examples
         """,
         formatter_class=argparse.RawTextHelpFormatter
     )
@@ -378,134 +379,111 @@ def setup_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "command", 
         nargs=argparse.REMAINDER, 
-        help="The command and arguments to run with TrustedInstaller privileges."
+        help="The command to run with TrustedInstaller privileges"
     )
-    
     parser.add_argument(
         "--no-warning", 
         action="store_true", 
-        help="Skip the warning dialog (use with extreme caution)."
+        help="Skip the safety warning (not recommended)"
     )
-    
     parser.add_argument(
-        "--log-level", 
-        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'], 
-        default='INFO',
-        help="Set logging level (default: INFO)."
+        "--system-info", 
+        action="store_true", 
+        help="Display system information and exit"
     )
-    
     parser.add_argument(
-        "--dry-run", 
-        action="store_true",
-        help="Show what would be executed without actually running the command."
+        "--help-extended", 
+        action="store_true", 
+        help="Show extended help with examples"
     )
-    
-    return parser
-
-def main():
-    """Main application entry point."""
-    parser = setup_argument_parser()
-    args = parser.parse_args()
-    
-    # Set logging level
-    logging.getLogger().setLevel(getattr(logging, args.log_level))
-    
-    header()
     
     try:
-        # Validate system requirements
-        validate_system()
-        
-        # Check if command was provided
-        if not args.command:
-            show_error("Missing Command", "Please provide a command to run.")
-            console.print("\n")
-            parser.print_help()
-            sys.exit(1)
-        
-        # Validate command
-        validate_command(args.command)
-        
-        # Check for administrator privileges
-        if not is_admin():
-            show_panel(
-                "Administrator privileges are required to run commands as TrustedInstaller.", 
-                title="Permission Required", 
-                style="yellow"
-            )
-            if Confirm.ask("[yellow bold]Restart with administrator privileges?[/yellow bold]"):
-                elevate_with_admin()
-            else:
-                show_error("Access Denied", "Administrator privileges declined.")
-                sys.exit(1)
-        
-        # System checks with progress indicator
-        with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), transient=True) as progress:
-            progress.add_task(description="Validating PowerShell installation...", total=None)
-            check_powershell()
-            
-            progress.add_task(description="Checking TrustedInstaller service...", total=None)
-            check_trustedinstaller_service()
-            
-            progress.add_task(description="Verifying NtObjectManager module...", total=None)
-            install_ntobjectmanager()
-        
-        console.rule("[blue]Command Review & Execution[/blue]")
-        show_command_preview(args.command)
-        
-        # Check for dangerous commands
-        if check_dangerous_command(args.command):
-            show_panel(
-                "[bold red]⚠️  POTENTIALLY DESTRUCTIVE COMMAND DETECTED ⚠️[/bold red]\n\n"
-                "This command may modify or delete system files.\n"
-                "Double-check your command before proceeding.",
-                title="High Risk Operation",
-                style="red"
-            )
-        
-        # Dry run mode
-        if args.dry_run:
-            show_panel(
-                "DRY RUN MODE: The command above would be executed with TrustedInstaller privileges.",
-                title="Dry Run",
-                style="blue"
-            )
-            sys.exit(0)
-        
-        # Warning and confirmation
-        if not args.no_warning:
-            show_rich_warning()
-            if not Confirm.ask("[red bold]Do you understand the risks and want to continue?[/red bold]"):
-                console.print("[yellow]Operation cancelled by user.[/yellow]")
-                sys.exit(0)
-        
-        # Final execution confirmation
-        if not Confirm.ask("[bold]Execute the command as TrustedInstaller?[/bold]"):
-            console.print("[yellow]Execution cancelled.[/yellow]")
-            sys.exit(0)
-        
-        show_panel("Launching command as TrustedInstaller...", title="Executing", style="blue")
-        
-        # Execute the command
-        run_as_trustedinstaller(args.command)
-        
-        show_panel(
-            "Command launched successfully in a new console window.\n"
-            "Check the new window for command output and results.",
-            title="Success",
-            style="green"
+        args = parser.parse_args(argv)
+    except SystemExit:
+        return
+    
+    # Show header
+    ui.show_header()
+    
+    # Handle special flags
+    if args.help_extended:
+        ui.show_help_panel()
+        return
+    
+    if args.system_info:
+        ui.show_system_info()
+        return
+    
+    # Validate command
+    if not args.command:
+        ui.show_error(
+            "Missing Command", 
+            "No command specified. Please provide a command to execute.",
+            "Use --help for usage information or --help-extended for examples."
+        )
+        return
+    
+    # Check administrator privileges
+    if not ui.is_admin():
+        ui.show_panel(
+            "Administrator privileges are required to use TrustedInstaller.",
+            title="Permission Required",
+            style="yellow"
         )
         
-    except KeyboardInterrupt:
-        console.print("\n[yellow]Operation cancelled by user.[/yellow]")
-        sys.exit(1)
-    except (SADOError, ValueError) as e:
-        show_error("Operation Failed", str(e))
-        sys.exit(1)
+        if ui.confirm_action("Request administrator elevation?"):
+            core.elevate_with_admin()
+        else:
+            ui.show_error("Access Denied", "Operation requires administrator privileges.")
+            return
+    
+    # System checks
+    try:
+        ui.show_panel("Performing system checks...", style="blue")
+        core.check_powershell()
+        core.install_ntobjectmanager()
+        ui.show_success("System checks completed successfully.")
+        
     except Exception as e:
-        logger.exception("Unexpected error occurred")
-        show_error("Unexpected Error", f"An unexpected error occurred: {e}")
+        ui.show_error("System Check Failed", str(e))
+        return
+    
+    # Display command preview
+    console.rule("[blue]Command Preview & Confirmation[/]")
+    ui.show_command_preview(args.command)
+    
+    # Show warning (unless disabled)
+    if not args.no_warning:
+        ui.show_warning_panel()
+        if not ui.confirm_action("Do you want to proceed with this potentially dangerous operation?"):
+            ui.show_panel("Operation cancelled by user.", style="yellow", title="Cancelled")
+            time.sleep(1)
+            return
+    
+    # Execute command
+    console.rule("[green]Execution[/]")
+    try:
+        output = core.run_as_trustedinstaller(args.command)
+        ui.show_success("Command executed successfully with TrustedInstaller privileges.")
+        
+        if output.strip():
+            ui.show_panel(
+                output.strip(),
+                title="Command Output",
+                style="green"
+            )
+            
+    except Exception as e:
+        ui.show_error("Execution Failed", str(e))
+        logger.error("Command execution failed", exc_info=True)
         sys.exit(1)
 
 if __name__ == "__main__":
-    main()
+    try:
+        main(sys.argv[1:])
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Operation cancelled by user.[/yellow]")
+        sys.exit(0)
+    except Exception as e:
+        console.print(f"\n[red]Unexpected error: {e}[/red]")
+        sys.exit(1)

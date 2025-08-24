@@ -1,4 +1,5 @@
-# if import ppc j error it
+import sys
+from paopao_cli.main import main
 
 if __name__ == "__main__":
-    raise RuntimeError("why are you importing this?, this is not a library, this is a CLI tool")
+    main()

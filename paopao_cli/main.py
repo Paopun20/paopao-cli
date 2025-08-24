@@ -5,6 +5,10 @@ A plugin-based CLI system with command management capabilities.
 Enhanced version with improved security, caching, and features.
 """
 
+# core import
+import paopao_cli
+
+# standard libraries
 import argparse
 import sys
 import json
@@ -17,12 +21,16 @@ import os
 import hashlib
 import time
 import threading
+import code
+
+# third-party libraries
 from pathlib import Path
 from typing import Dict, Tuple, Optional, List, Any
 from urllib.parse import urlparse
 from dataclasses import dataclass, asdict
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
+# rich libraries
 import rich_argparse
 from rich.console import Console
 from rich.table import Table
@@ -72,6 +80,151 @@ class CommandMetadata:
             self.dependencies = []
 
 console = Console()
+
+# ---- REPL mode ----
+class REPL(code.InteractiveConsole):
+    """Enhanced REPL for testing command scripts with PaoPao integration."""
+    
+    def __init__(self, local_vars=None, command_manager=None):
+        super().__init__(locals=local_vars)
+        self.stop_event = threading.Event()
+        self.command_manager = command_manager
+        self.history = []
+        self.max_history = 100
+        
+        # Setup default environment
+        if local_vars is None:
+            self.setup_default_environment()
+    
+    def setup_default_environment(self):
+        """Setup default REPL environment with useful imports and variables."""
+        # Import common modules
+        import os
+        import sys
+        import json
+        import subprocess
+        import shutil
+        from pathlib import Path
+        
+        # Make them available in REPL
+        self.locals.update({
+            'os': os,
+            'sys': sys,
+            'json': json,
+            'subprocess': subprocess,
+            'shutil': shutil,
+            'Path': Path,
+            'console': console,
+            'cm': self.command_manager,
+            'help': self.show_help,
+            'exit': self.exit_repl,
+            'quit': self.exit_repl,
+            'clear': self.clear_screen,
+            'history': self.show_history,
+            'load_command': self.load_command_test
+        })
+    
+    def load_command_test(self, command_name):
+        """Load a command for testing in REPL."""
+        if self.command_manager:
+            commands_metadata, command_paths = self.command_manager.get_available_commands()
+            if command_name in command_paths:
+                try:
+                    spec = importlib.util.spec_from_file_location(command_name, command_paths[command_name])
+                    if spec and spec.loader:
+                        module = importlib.util.module_from_spec(spec)
+                        spec.loader.exec_module(module)
+                        self.locals[command_name] = module
+                        console.print(f"[green]✅ Loaded command '{command_name}' as variable '{command_name}'[/green]")
+                        return module
+                except Exception as e:
+                    console.print(f"[red]❌ Error loading command: {e}[/red]")
+        else:
+            console.print("[yellow]⚠️ Command manager not available[/yellow]")
+        return None
+    
+    def show_help(self):
+        """Show REPL help information."""
+        help_text = """
+[bold]PaoPao REPL Mode Help:[/bold]
+
+[cyan]Available built-in variables:[/cyan]
+  os, sys, json, subprocess, shutil, Path, console, cm
+
+[cyan]Available built-in functions:[/cyan]
+  help()      - Show this help
+  exit()      - Exit REPL mode
+  clear()     - Clear screen
+  history()   - Show command history
+  load_command(name) - Load a PaoPao command for testing
+
+[cyan]Example usage:[/cyan]
+  >>> result = subprocess.run(['ls', '-la'], capture_output=True, text=True)
+  >>> print(result.stdout)
+  >>> load_command('some_command')
+  >>> some_command.main(['--help'])
+
+[cyan]Use Ctrl-D or type 'exit()' to quit.[/cyan]
+"""
+        console.print(Panel.fit(help_text, title="🧪 REPL Help", border_style="blue"))
+    
+    def exit_repl(self):
+        """Exit the REPL."""
+        self.stop_event.set()
+        raise SystemExit
+    
+    def clear_screen(self):
+        """Clear the console screen."""
+        console.clear()
+        return "Screen cleared"
+    
+    def show_history(self):
+        """Show command history."""
+        if not self.history:
+            console.print("[dim]No history yet[/dim]")
+            return
+        
+        table = Table(title="📜 Command History", box=box.SIMPLE)
+        table.add_column("#", style="dim")
+        table.add_column("Command", style="cyan")
+        
+        for i, cmd in enumerate(self.history[-10:], 1):  # Show last 10 commands
+            table.add_row(str(i), cmd)
+        
+        console.print(table)
+        return f"Showing {len(self.history)} commands in history"
+    
+    def runsource(self, source, filename="<input>", symbol="single"):
+        """Override to capture history and handle multi-line input."""
+        self.history.append(source)
+        if len(self.history) > self.max_history:
+            self.history.pop(0)
+        
+        try:
+            return super().runsource(source, filename, symbol)
+        except Exception as e:
+            console.print(f"[red]Error: {e}[/red]")
+            return False
+    
+    def run(self, banner=None):
+        """Run the enhanced REPL."""
+        if banner is None:
+            banner = """
+[bold green]🧪 PaoPao REPL Mode (experiment)[/bold green]
+[dim]Type 'help()' for assistance, 'exit()' to quit.[/dim]
+[dim]Loaded commands available through load_command('name')[/dim]
+"""
+        
+        console.print(banner)
+        
+        try:
+            self.interact(banner="")
+        except SystemExit:
+            pass
+        except Exception as e:
+            console.print(f"[red]Error in REPL: {e}[/red]")
+        finally:
+            console.print("[bold green]👋 Exiting REPL mode.[/bold green]")
 
 # ---- Utility Classes ----
 class SecurityValidator:
@@ -442,6 +595,7 @@ class CommandManager:
         usage_table.add_row("ppc info <name>", "Show detailed command information")
         usage_table.add_row("ppc test [--file script.py]", "Test a local command script")
         usage_table.add_row("ppc doctor", "Check system health and dependencies")
+        usage_table.add_row("ppc repl", "Enter REPL mode for testing commands")
         
         console.print(Panel.fit(usage_table, title="[bold yellow]📋 Management Commands[/bold yellow]", border_style="bright_blue"))
 
@@ -1070,6 +1224,8 @@ class BuiltinCommands:
                     )
                     
                     progress.update(task, completed=True)
+                except Exception as e:
+                    raise Exception(f"Error during git update: {e}")
                 
                 # Update metadata
                 meta["last_updated"] = datetime.datetime.now().isoformat()
@@ -1200,7 +1356,43 @@ class PaoPaoCLI:
             "info": self.builtin_commands.info,
             "search": self.builtin_commands.search,
             "doctor": self.builtin_commands.doctor,
+            "repl": self.enter_repl_mode,  # Add REPL command
         }
+    
+    def enter_repl_mode(self, argv: list):
+        """Enter REPL mode with optional command loading."""
+        parser = argparse.ArgumentParser(
+            prog="ppc repl",
+            description="Enter interactive REPL mode for testing and development"
+        )
+        parser.add_argument("-c", "--command", help="Pre-load a command into REPL")
+        parser.add_argument("-e", "--exec", help="Execute a command and stay in REPL")
+        parser.add_argument("--no-banner", action="store_true", help="Don't show banner")
+        
+        try:
+            args = parser.parse_args(argv)
+        except SystemExit:
+            return
+        
+        # Create REPL instance
+        repl = REPL(command_manager=self.command_manager)
+        
+        # Pre-load command if specified
+        if args.command:
+            repl.load_command_test(args.command)
+        
+        # Execute command if specified
+        if args.exec:
+            console.print(f"[dim]Executing: {args.exec}[/dim]")
+            try:
+                # Use runsource to execute the command
+                repl.runsource(args.exec)
+            except Exception as e:
+                console.print(f"[red]Error executing command: {e}[/red]")
+        
+        # Run REPL
+        banner = None if args.no_banner else None  # Let REPL class handle default banner
+        repl.run(banner)
     
     def run(self):
         """Enhanced main entry point for the CLI."""
@@ -1223,10 +1415,20 @@ class PaoPaoCLI:
         parser.add_argument(
             "--version", 
             action="version", 
-            version="PaoPao CLI Framework v2.0 (Enhanced Edition)"
+            version=f"PaoPao CLI Framework ${paopao_cli.ppc_core.get_version()}"
+        )
+        parser.add_argument(
+            "--repl",
+            action="store_true",
+            help="Enter REPL mode for interactive testing"
         )
         
         args = parser.parse_args()
+        
+        # Handle --repl flag
+        if args.repl:
+            self.enter_repl_mode([])
+            return
         
         # Show help if no command provided
         if args.command is None:
