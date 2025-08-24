@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-🥭 PaoPao CLI Framework - Bug Fixes
-Fixed issues with imports, REPL mode, git operations, and error handling.
+🥭 PaoPao CLI Framework
+A plugin-based CLI system with built-in commands and community addons.
 """
 
 # core import
