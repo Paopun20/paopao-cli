@@ -423,7 +423,8 @@ def show_full_year_calendar(year: Optional[int] = None, show_week_numbers: bool 
     # Create title
     console.print(Panel(
         Text(f"Calendar for {year}", justify="center", style="bold white on dark_blue"),
-        style="bright_blue"
+        style="bright_blue",
+        expand=False
     ))
     
     quarter_columns = []
@@ -449,7 +450,7 @@ def show_full_year_calendar(year: Optional[int] = None, show_week_numbers: bool 
             quarter_column,
             title=q_name,
             style=color,
-            expand=True
+            expand=False
         )
         quarter_columns.append(quarter_panel)
     
