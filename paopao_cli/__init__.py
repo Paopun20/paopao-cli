@@ -1,3 +1,3 @@
 class ppc_core:
     def get_version():
-        return "0.0.dev9"
+        return "0.0.1.dev10"

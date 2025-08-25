@@ -1,4 +1,4 @@
-![PaoPao Logo](./docs/ppc_icon.png)
+![PaoPao Logo](https://raw.githubusercontent.com/Paopun20/paopao-cli/main/docs/ppc_icon.png)
 
 # 🥭 PaoPao's CLI Framework
 
@@ -44,7 +44,7 @@ A **powerful, secure, and extensible Command Line Interface (CLI) framework** de
 
 ### Quick Install
 ```bash
-pip install git+https://github.com/Paopun20/paopao-cli.git
+pip install paopao-cli
 ```
 
 ### Development Install
@@ -149,15 +149,18 @@ my-command/
 │   ├── command_name.py
 │   ├── another_command.py
 │   └── ...
-├── ppc.project.json     # Project metadata
+├── ppc.project.json     # Project metadata (legacy)
+├── ppc.project.toml     # Project metadata (0.0.1.dev10+)
 ├── requirements.txt     # Dependencies (optional)
 └── README.md           # Documentation (optional)
+```
 
 # Legacy Structure (can add only one command per repository)
 ```
 my-command/
 ├── main.py              # Entry point (required)
-├── ppc.project.json     # Project metadata
+├── ppc.project.json     # Project metadata (legacy)
+├── ppc.project.toml     # Project metadata (0.0.1.dev10+)
 ├── requirements.txt     # Dependencies (optional)
 └── README.md           # Documentation (optional)
 ```
@@ -166,17 +169,28 @@ my-command/
 
 ## 🔧 Advanced Configuration
 
-### Project Metadata (`ppc.project.json`)
+### Project Metadata (`ppc.project.toml`) (0.0.1.dev10+)
+```toml
+[project]
+name = "plugin-name"
+version = "0.1.0"
+description = "Description plugin"
+author = "Developer name"
+python_version = ">=3.9"
+dependencies = ["rich", "requests"]
+```
+
+### Project Metadata (`ppc.project.json`) (legacy)
 ```json
 {
-  "name": "awesome-tool",
-  "version": "1.2.0",
-  "author": "Your Name",
-  "description": "An awesome command-line tool",
-  "python_version": "3.7+",
-  "dependencies": ["requests", "click"],
+  "name": "plugin-name",
+  "version": "0.1.0",
+  "author": "Developer name",
+  "description": "Description plugin",
+  "python_version": ">=3.9",
+  "dependencies": ["rich", "requests"],
   "keywords": ["automation", "productivity"],
-  "homepage": "https://github.com/user/awesome-tool"
+  "homepage": "https://github.com/user/plugin-name"
 }
 ```
 
@@ -261,12 +275,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 💬 Support
 
 - 🐛 **Issues**: [GitHub Issues](https://github.com/Paopun20/paopao-cli/issues)
-
----
-
-## 🌟 Acknowledgments
-
-- **Rich** library for beautiful terminal output
-- **Python** community for excellent tooling
-- **Git** for reliable version control
-- **Open Source** contributors worldwide

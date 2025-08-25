@@ -20,6 +20,7 @@ except ImportError:
 import argparse
 import sys
 import json
+import tomllib
 import subprocess
 import shutil
 import datetime
@@ -60,7 +61,8 @@ class Config:
     COMMANDS_DIR: Path = Path(__file__).parent / "ppc_commands"
     COMMUNITY_COMMANDS_DIR: Path = Path(__file__).parent / "ppc_addon"
     CACHE_DIR: Path = Path(__file__).parent / ".ppc_cache"
-    PROJECT_META_FILE: str = "ppc.project.json"
+    JSON_PROJECT_META_FILE: str = "ppc.project.json"
+    TOML_PROJECT_META_FILE: str = "ppc.project.toml"
     GIT_META_FILE: str = ".ppc.git"
     LOCK_FILE: str = ".ppc.lock"
     CACHE_EXPIRY_HOURS: int = 24
@@ -659,14 +661,24 @@ class CommandManager:
     def load_command_metadata(self, folder: Path, name: str, source: str) -> CommandMetadata:
         """Load comprehensive metadata for a command."""
         # Load project metadata from JSON
-        project_file = folder / self.config.PROJECT_META_FILE
+        project_file = folder / self.config.TOML_PROJECT_META_FILE
         project_data = {}
         
         if project_file.exists():
             try:
-                project_data = json.loads(project_file.read_text(encoding="utf-8"))
-            except (json.JSONDecodeError, IOError, UnicodeDecodeError):
+                with project_file.open("rb") as f:
+                    toml_data = tomllib.load(f)
+                    project_data = toml_data.get("project", {})
+            except (tomllib.TOMLDecodeError, IOError, UnicodeDecodeError):
                 pass
+        else:
+            # legacy support
+            project_file = folder / self.config.JSON_PROJECT_META_FILE
+            if project_file.exists():
+                try:
+                    project_data = json.loads(project_file.read_text(encoding="utf-8"))
+                except (json.JSONDecodeError, IOError, UnicodeDecodeError):
+                    pass
         
         # Load git metadata
         git_meta_file = folder / self.config.GIT_META_FILE
@@ -1731,7 +1743,7 @@ class PaoPaoCLI:
         try:
             version_str = f"PaoPao's CLI Framework v{ppc_core.get_version()}"
         except AttributeError:
-            version_str = "PaoPao's CLI Framework v1.0.0-dev"
+            version_str = "PaoPao's CLI Framework vUnknown (some file is missing)"
         
         parser.add_argument(
             "--version", 
