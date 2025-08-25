@@ -22,45 +22,33 @@ import contextlib
 # ─────────────────────────────────────────────────────────────────────────────
 
 class SafeOutput:
-    """
-    Safe output wrapper that gracefully handles broken pipes and other I/O errors.
-    Supports both stdout and file output.
-    """
-    
-    def __init__(self, output_file: Optional[TextIO] = None, buffer_size: int = 8192):
+    def __init__(self, output_file: Optional[TextIO] = None, buffer_size: int = 65536):
         self.output_file = output_file or sys.stdout
         self.closed = False
         self.buffer = []
         self.buffer_size = buffer_size
         self.bytes_written = 0
         self.lines_written = 0
-        
+
     def write(self, text: str) -> bool:
-        """Write text to output. Returns False if output is closed/broken."""
         if self.closed:
             return False
-        
         try:
-            # Buffer output for better performance
             self.buffer.append(text)
-            if len(self.buffer) >= self.buffer_size:
+            if sum(len(x) for x in self.buffer) >= self.buffer_size:
                 self._flush_buffer()
             return True
         except (BrokenPipeError, OSError, ValueError):
             self.closed = True
             return False
-    
+
     def _flush_buffer(self) -> bool:
-        """Flush the internal buffer to output."""
         if not self.buffer or self.closed:
             return True
-            
         try:
             content = ''.join(self.buffer)
             self.output_file.write(content)
             self.output_file.flush()
-            
-            # Update statistics
             self.bytes_written += len(content)
             self.lines_written += content.count('\n')
             self.buffer.clear()
@@ -68,22 +56,39 @@ class SafeOutput:
         except (BrokenPipeError, OSError, ValueError):
             self.closed = True
             return False
-    
-    def close(self) -> None:
-        """Close the output and flush any remaining buffer."""
-        if not self.closed:
-            self._flush_buffer()
-            if self.output_file != sys.stdout:
-                self.output_file.close()
-            self.closed = True
-    
-    def get_stats(self) -> dict:
-        """Get output statistics."""
-        return {
-            'bytes_written': self.bytes_written,
-            'lines_written': self.lines_written,
-            'closed': self.closed
-        }
+
+# Optimized yes_worker for infinite output
+def yes_worker(worker_id: int, text: str, count: Union[int, float], delay: float, 
+               quiet: bool, output_file: Optional[str] = None, mode: str = "normal",
+               stats_queue: Optional[queue.Queue] = None) -> None:
+    stats = WorkerStats()
+    try:
+        output = SafeOutput(open(output_file, 'w') if output_file else None)
+        generator = TextGenerator(text, mode)
+
+        i = 0
+        infinite = count == float("inf")
+        while infinite or i < count:
+            if not quiet:
+                generated_text = generator.generate() + "\n"
+                if not output.write(generated_text):
+                    break
+                stats.lines_output += 1
+                stats.bytes_output += len(generated_text)
+
+            i += 1
+            if delay > 0:
+                time.sleep(delay)
+
+        output._flush_buffer()
+        output.close()
+        stats.finish()
+    except KeyboardInterrupt:
+        stats.finish(interrupted=True)
+    finally:
+        if stats_queue:
+            stats_queue.put(('stats', worker_id, stats))
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # System Detection and Environment

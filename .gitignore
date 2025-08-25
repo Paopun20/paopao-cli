@@ -7,3 +7,8 @@ __pycache__/*
 *.pyc
 *.log
 paopao_cli/.ppc_cache/*
+*.exp
+*.c
+*.lib
+*.obj
+*.pyd
