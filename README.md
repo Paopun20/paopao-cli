@@ -1,6 +1,6 @@
 ![PaoPao Logo](./docs/ppc_icon.png)
 
-# 🥭 PaoPao CLI Framework
+# 🥭 PaoPao's CLI Framework
 
 A **powerful, secure, and extensible Command Line Interface (CLI) framework** designed to revolutionize your terminal workflow. Built with Python, it offers advanced plugin management, security features, and a rich user experience.
 
@@ -247,7 +247,7 @@ ppc doctor  # Basic check
 ## 🤝 Contributing
 
 ### Creating Commands
-This is a simple template to create your own command compatible with PaoPao CLI.
+This is a simple template to create your own command compatible with PaoPao's CLI.
 AND THIS REPO IS OPEN SOURCE, YOU CAN CONTRIBUTE YOUR COMMANDS TO THE COMMUNITY! BUT UNDER APACHE LICENSE 2.0
 
 ---

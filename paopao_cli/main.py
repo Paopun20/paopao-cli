@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🥭 PaoPao CLI Framework
+🥭 PaoPao's CLI Framework
 A plugin-based CLI system with built-in commands and community addons.
 """
 
@@ -8,7 +8,7 @@ A plugin-based CLI system with built-in commands and community addons.
 try:
     from . import ppc_core
 except ImportError:
-    raise RuntimeError("Bruh, PaoPao CLI core not found. You are remove __init__.py file?")
+    raise RuntimeError("Bruh, PaoPao's CLI core not found. You are remove __init__.py file?")
 
 try:
     import git
@@ -1712,7 +1712,7 @@ class PaoPaoCLI:
         
         parser = argparse.ArgumentParser(
             prog="ppc",
-            description="🥭 PaoPao CLI Framework - Enhanced plugin-based command system",
+            description="🥭 PaoPao's CLI Framework - Enhanced plugin-based command system",
             formatter_class=formatter_class,
             add_help=False
         )
@@ -1729,9 +1729,9 @@ class PaoPaoCLI:
         
         # Fixed: Get version from our mock module
         try:
-            version_str = f"PaoPao CLI Framework v{ppc_core.get_version()}"
+            version_str = f"PaoPao's CLI Framework v{ppc_core.get_version()}"
         except AttributeError:
-            version_str = "PaoPao CLI Framework v1.0.0-dev"
+            version_str = "PaoPao's CLI Framework v1.0.0-dev"
         
         parser.add_argument(
             "--version", 

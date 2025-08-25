@@ -2,7 +2,7 @@
   "name": "Test Commands",
   "version": "1.0.0",
   "author": "paopaodev",
-  "description": "A collection of useful commands for PaoPao CLI",
+  "description": "A collection of useful commands for PaoPao's CLI",
   "python_version": "3.8+",
   "dependencies": [
     "requests",
