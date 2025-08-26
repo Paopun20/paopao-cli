@@ -1,0 +1,5 @@
+class PaoPaoCLIError(Exception): pass; """Base exception for PaoPao CLI errors."""
+class SecurityValidationError(PaoPaoCLIError): pass; """Raised when a security validation fails."""
+class CommandNotFoundError(PaoPaoCLIError): pass; """Raised when a command is not found."""
+class CacheError(PaoPaoCLIError): pass; """Raised when a cache error occurs."""
+class InstallationError(PaoPaoCLIError): pass; """Raised when an installation error occurs."""
