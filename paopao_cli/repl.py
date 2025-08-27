@@ -7,7 +7,7 @@ import threading
 import importlib.util
 from pathlib import Path
 from typing import Optional, Dict
-from ppc_src.terminal import Terminal  # <-- your event-driven Terminal class
+from paopao.terminal import Terminal  # <-- your event-driven Terminal class
 
 class PaoPaoREPL(Terminal):
     """Enhanced REPL with PaoPao integration and Terminal events."""
